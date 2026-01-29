@@ -1,21 +1,20 @@
 #include <Arduino.h>
-#include "BLECom.hpp"
+#include "CANCom.hpp"
 #include "ELMCom.hpp"
-#include "MCP2515.hpp"
+#include "BLECom.hpp"
 
 BLECom ble;
 ELMCom elm;
-MCP2515CAN can;
+CANCom can(5); // CS MCP2515 = GPIO5
 
-void setup()
-{
-  Serial.begin(115200);
-  can.begin();
-  elm.attachCAN(&can);
-  ble.attachELM(&elm);
-  ble.begin();
+void setup() {
+    Serial.begin(115200);
+    can.begin();
+    elm.attachCAN(&can); // relie ELMCom à CANCom
+    ble.attachELM(&elm); // relie BLECom à ELMCom
+    ble.begin();
 }
 
-void loop()
-{
+void loop() {
+    // tout est géré par BLE callbacks
 }

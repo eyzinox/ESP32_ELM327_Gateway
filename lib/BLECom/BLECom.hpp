@@ -34,7 +34,8 @@ private:
             String val = c->getValue();
             parent->handleWrite(val.c_str(), val.length());
         }
-        void onDisconnect(BLEServer *s) override { s->getAdvertising()->start(); }
+        void onConnect(BLEServer *s) override { Serial.println("[BLE] Client connected"); }
+        void onDisconnect(BLEServer *s) override { s->getAdvertising()->start(); Serial.println("[BLE] Client disconnected"); }
     };
 
 public:

@@ -1,7 +1,7 @@
 #ifndef CANFRAME_HPP
 #define CANFRAME_HPP
 
-#include <stdint.h>
+#include <Arduino.h>
 
 struct CANFrame {
     uint32_t id;

@@ -1,8 +1,9 @@
+// ELMCom.cpp
 #include "ELMCom.hpp"
 #include <Arduino.h>
 #include <cstring>
 
-void ELMCom::attachCAN(CANBus *bus)
+void ELMCom::attachCAN(CANCom *bus)
 {
     can = bus;
 }

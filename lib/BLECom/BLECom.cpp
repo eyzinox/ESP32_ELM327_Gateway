@@ -1,10 +1,11 @@
+// BLECom.cpp
 #include "BLECom.hpp"
 #define DEBUG_BLE_COM 1
 
 void BLECom::begin()
 {
     Serial.begin(115200);
-    Serial.println("ESP32 BLE ELM327 Starting...");
+    Serial.println("[BLE] Starting...");
 
     BLEDevice::init(DEVICE_NAME);
     BLEServer *server = BLEDevice::createServer();
@@ -31,7 +32,7 @@ void BLECom::begin()
     adv->start();
 
     delay(500);
-    Serial.println("BLE ready!");
+    Serial.println("[BLE] Ready!");
 }
 
 void BLECom::handleWrite(const char *data, size_t len)

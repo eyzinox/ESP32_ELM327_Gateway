@@ -1,7 +1,7 @@
 #ifndef ELMCOM_HPP
 #define ELMCOM_HPP
 
-#include "CANBus.hpp"
+#include "CANCom.hpp"
 #include "CANFrame.hpp"
 
 #include <stddef.h>
@@ -11,14 +11,14 @@
 class ELMCom
 {
 private:
-    CANBus *can = nullptr;
+    CANCom *can = nullptr;
 
     bool isATCommand(const char *cmd);
     const char *handleATCommand(const char *cmd, size_t &len);
     const char *handleOBDCommand(const char *cmd, size_t &len);
 
 public:
-    void attachCAN(CANBus *bus);
+    void attachCAN(CANCom *bus);
     const char *processCommand(const char *cmd, size_t &len);
 };
 
