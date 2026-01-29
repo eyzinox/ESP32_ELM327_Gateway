@@ -1,4 +1,5 @@
 #include "BLECom.hpp"
+#define DEBUG_BLE_COM 1
 
 void BLECom::begin()
 {
@@ -35,6 +36,26 @@ void BLECom::begin()
 
 void BLECom::handleWrite(const char *data, size_t len)
 {
+#ifdef DEBUG_BLE_COM
+    Serial.println("==== BLE RX ====");
+    Serial.print("HEX : ");
+    for (size_t i = 0; i < len; i++)
+        Serial.printf("%02X ", (uint8_t)data[i]);
+    Serial.println();
+
+    Serial.print("ASCII : ");
+    for (size_t i = 0; i < len; i++)
+    {
+        char c = data[i];
+        if (c >= 32 && c <= 126)
+            Serial.print(c);
+        else
+            Serial.print('.');
+    }
+    Serial.println("\n================");
+#endif
+
+    // ton buffer existant
     for (size_t i = 0; i < len; i++)
     {
         char c = data[i];
@@ -42,11 +63,11 @@ void BLECom::handleWrite(const char *data, size_t len)
             continue;
         if (c == '\r')
         {
-            if (rxIndex > 0)
+            if (rxIndex > 0 && elm)
             {
-                rxBuffer[rxIndex] = 0;
+                rxBuffer[rxIndex] = 0; // termine la string
                 size_t respLen = 0;
-                const char *resp = obd.processCommand(rxBuffer, respLen);
+                const char *resp = elm->processCommand(rxBuffer, respLen);
                 sendResponse(resp, respLen);
                 rxIndex = 0;
             }
@@ -63,6 +84,7 @@ void BLECom::handleWrite(const char *data, size_t len)
 
 void BLECom::sendResponse(const char *resp, size_t len)
 {
+#ifdef DEBUG_BLE_COM
     Serial.println("==== BLE TX ====");
     Serial.print("HEX : ");
     for (size_t i = 0; i < len; i++)
@@ -79,6 +101,7 @@ void BLECom::sendResponse(const char *resp, size_t len)
             Serial.print('.');
     }
     Serial.println("\n================");
+#endif
 
     if (pTxCharacteristic)
     {
