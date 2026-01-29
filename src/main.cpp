@@ -1,18 +1,14 @@
 #include <Arduino.h>
+#include "BLECom.hpp"
 
-// put function declarations here:
-int myFunction(int, int);
+BLECom bleCom;
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+void setup()
+{
+  bleCom.begin();
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+void loop()
+{
+  // Tout est géré par BLECom
 }
