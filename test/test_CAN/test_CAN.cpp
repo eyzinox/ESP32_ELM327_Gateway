@@ -1,4 +1,4 @@
-#include <Arduino.h>
+/*#include <Arduino.h>
 #include <SPI.h>
 #include <mcp2515.h>
 #include "BluetoothSerial.h"
@@ -130,4 +130,4 @@ void loop() {
   SerialBT.println(json);
 
   delay(POLL_INTERVAL);
-}
+}*/

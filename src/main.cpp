@@ -6,175 +6,149 @@
 #include <mcp2515.h>
 #include <SPI.h>
 
-// ─── BLE ─────────────────────────────────────────────────────
+#include "com_OBD.h"
+#include "com_AT.h"
+
+// BLE
 #define DEVICE_NAME "OBD_Logger"
 #define SERVICE_UUID "12345678-1234-1234-1234-1234567890ab"
 #define CHAR_UUID_RX "12345678-1234-1234-1234-1234567890ac"
 #define CHAR_UUID_TX "12345678-1234-1234-1234-1234567890ad"
 
-// ─── CAN ─────────────────────────────────────────────────────
+// MCP2515
 #define CS_PIN 5
 #define CAN_SPEED CAN_500KBPS
 #define CAN_CLOCK MCP_8MHZ
 
-#define OBD_REQUEST 0x7DF
-#define RESPONSE_MIN 0x7E8
-#define RESPONSE_MAX 0x7EF
+#define DEBUG 1
 
-#define CAN_TIMEOUT_MS 200
+// #define OBD_REQUEST 0x7DF
+// #define RESPONSE_MIN 0x7E8
+// #define RESPONSE_MAX 0x7EF
+
+// #define CAN_TIMEOUT_MS 200
 
 BLECharacteristic *pTxCharacteristic = nullptr;
-MCP2515 mcp2515(CS_PIN);
 
-// ─── Debug CAN ───────────────────────────────────────────────
-void debugCAN(const char *label, const struct can_frame &f)
-{
-    Serial.printf("[%s] ID=0x%03X DLC=%d | ", label, f.can_id, f.can_dlc);
-    for (int i = 0; i < f.can_dlc; i++)
-        Serial.printf("%02X ", f.data[i]);
-    Serial.println();
-}
+void sendResponse(const char *resp);
 
-// ─── Envoi BLE ───────────────────────────────────────────────
-void sendResponse(const char *resp)
-{
-    if (pTxCharacteristic)
-    {
-        pTxCharacteristic->setValue((uint8_t *)resp, strlen(resp));
-        pTxCharacteristic->notify();
-    }
-}
-
-// ─── Traitement commandes ─────────────────────────────────────
+// Fonction de traitement
 void processCommand(String cmd)
 {
+    String response = "";
+
     cmd.trim();
     cmd.toUpperCase();
 
-    if (cmd.startsWith("01") && cmd.length() == 5 && cmd.endsWith("1"))
-        cmd = cmd.substring(0, 4);
-
-    Serial.printf("[CMD] %s\n", cmd.c_str());
-
-    // ─── AT commands ─────────────────────────────
-    if (cmd == "ATZ" || cmd == "ATI" || cmd == "STI" || cmd == "VTI")
+    if(isCommandAT(cmd))
     {
-        sendResponse("ELM327 v1.5\r\n>");
-        return;
+        if (DEBUG)
+            Serial.printf("[AT CMD] %s\n", cmd.c_str());
+        response = processCommandAT(cmd);
     }
-    else if (cmd == "ATE0" || cmd == "ATH1" || cmd == "ATS0" || cmd == "ATM0" || cmd == "ATAL" || cmd == "ATAT1")
+    else if (isCommandOBD(cmd))
     {
-        sendResponse("OK\r\n>");
-        return;
+        if (DEBUG)
+            Serial.printf("[OBD CMD] %s\n", cmd.c_str());
+        response = processCommandOBD(cmd);
     }
-    else if (cmd == "ATDP")
+    else
     {
-        sendResponse("ISO 15765-4 (CAN 11/500)\r\n>");
-        return;
-    }
-    else if (cmd == "ATDPN")
-    {
-        sendResponse("A6\r\n>");
-        return;
-    }
-    else if (cmd == "ATRV")
-    {
-        sendResponse("13.8V\r\n>");
-        return;
-    }
-    else if (cmd.startsWith("AT"))
-    {
-        sendResponse("OK\r\n>");
-        return;
+        response = "NO DATA" + String((Config.linefeeds) ? "\r\n>" : ">");
     }
 
-    // ─── MODE 01 ────────────────────────────────
-    if (cmd.startsWith("01"))
-    {
-        uint8_t pid = (uint8_t)strtol(cmd.substring(2).c_str(), nullptr, 16);
+    // Envoi réponse
+    sendResponse(response.c_str());
 
-        Serial.printf("[OBD] PID 0x%02X\n", pid);
+    // Serial.printf("[CMD] %s\n", cmd.c_str());
 
-        // Flush CAN
-        struct can_frame tmp;
-        while (mcp2515.readMessage(&tmp) == MCP2515::ERROR_OK)
-            ;
+    // // ─── MODE 01 ────────────────────────────────
+    // if (cmd.startsWith("01"))
+    // {
+    //     uint8_t pid = (uint8_t)strtol(cmd.substring(2).c_str(), nullptr, 16);
 
-        // ─── Envoi requête ───────────────────────
-        struct can_frame tx;
-        tx.can_id = OBD_REQUEST;
-        tx.can_dlc = 8;
+    //     Serial.printf("[OBD] PID 0x%02X\n", pid);
 
-        tx.data[0] = 0x02;
-        tx.data[1] = 0x01;
-        tx.data[2] = pid;
-        for (int i = 3; i < 8; i++)
-            tx.data[i] = 0;
+    //     // Flush CAN
+    //     struct can_frame tmp;
+    //     while (mcp2515.readMessage(&tmp) == MCP2515::ERROR_OK)
+    //         ;
 
-        debugCAN("TX", tx);
+    //     // ─── Envoi requête ───────────────────────
+    //     struct can_frame tx;
+    //     tx.can_id = OBD_REQUEST;
+    //     tx.can_dlc = 8;
 
-        if (mcp2515.sendMessage(&tx) != MCP2515::ERROR_OK)
-        {
-            sendResponse("NO DATA\r\n>");
-            return;
-        }
+    //     tx.data[0] = 0x02;
+    //     tx.data[1] = 0x01;
+    //     tx.data[2] = pid;
+    //     for (int i = 3; i < 8; i++)
+    //         tx.data[i] = 0;
 
-        delay(5); // important
+    //     debugCAN("TX", tx);
 
-        // ─── Attente réponse ─────────────────────
-        struct can_frame rx;
-        unsigned long start = millis();
+    //     if (mcp2515.sendMessage(&tx) != MCP2515::ERROR_OK)
+    //     {
+    //         sendResponse("NO DATA\r\n>");
+    //         return;
+    //     }
 
-        while (millis() - start < CAN_TIMEOUT_MS)
-        {
-            if (mcp2515.readMessage(&rx) != MCP2515::ERROR_OK)
-                continue;
+    //     delay(5); // important
 
-            debugCAN("RX", rx);
+    //     // ─── Attente réponse ─────────────────────
+    //     struct can_frame rx;
+    //     unsigned long start = millis();
 
-            if (rx.can_id < RESPONSE_MIN || rx.can_id > RESPONSE_MAX)
-                continue;
+    //     while (millis() - start < CAN_TIMEOUT_MS)
+    //     {
+    //         if (mcp2515.readMessage(&rx) != MCP2515::ERROR_OK)
+    //             continue;
 
-            if (rx.data[1] == 0x7F)
-            {
-                sendResponse("NO DATA\r\n>");
-                return;
-            }
+    //         debugCAN("RX", rx);
 
-            if (rx.data[1] != 0x41 || rx.data[2] != pid)
-                continue;
+    //         if (rx.can_id < RESPONSE_MIN || rx.can_id > RESPONSE_MAX)
+    //             continue;
 
-            uint8_t len = rx.data[0];
+    //         if (rx.data[1] == 0x7F)
+    //         {
+    //             sendResponse("NO DATA\r\n>");
+    //             return;
+    //         }
 
-            // ─── Format réponse ELM ───────────────
-            char resp[64];
-            snprintf(resp, sizeof(resp), "%03X %02X 41 %02X",
-                     rx.can_id, len, pid);
+    //         if (rx.data[1] != 0x41 || rx.data[2] != pid)
+    //             continue;
 
-            for (int i = 0; i < (len - 2); i++)
-            {
-                char tmp[8];
-                snprintf(tmp, sizeof(tmp), " %02X", rx.data[3 + i]);
-                strcat(resp, tmp);
-            }
+    //         uint8_t len = rx.data[0];
 
-            strcat(resp, "\r\n>");
+    //         // ─── Format réponse ELM ───────────────
+    //         char resp[64];
+    //         snprintf(resp, sizeof(resp), "%03X %02X 41 %02X",
+    //                  rx.can_id, len, pid);
 
-            Serial.printf("[RESP] %s\n", resp);
-            sendResponse(resp);
-            return;
-        }
+    //         for (int i = 0; i < (len - 2); i++)
+    //         {
+    //             char tmp[8];
+    //             snprintf(tmp, sizeof(tmp), " %02X", rx.data[3 + i]);
+    //             strcat(resp, tmp);
+    //         }
 
-        Serial.println("[OBD] Timeout");
-        sendResponse("NO DATA\r\n>");
-        return;
-    }
+    //         strcat(resp, "\r\n>");
 
-    // ─── Inconnu ───────────────────────────────
-    sendResponse("NO DATA\r\n>");
+    //         Serial.printf("[RESP] %s\n", resp);
+    //         sendResponse(resp);
+    //         return;
+    //     }
+
+    //     Serial.println("[OBD] Timeout");
+    //     sendResponse("NO DATA\r\n>");
+    //     return;
+    // }
+
+    // // ─── Inconnu ───────────────────────────────
+    // sendResponse("NO DATA\r\n>");
 }
 
-// ─── BLE callbacks ───────────────────────────────────────────
+// BLE callbacks 
 class ServerCallbacks : public BLEServerCallbacks
 {
     void onConnect(BLEServer *) override
@@ -196,11 +170,27 @@ class RxCallbacks : public BLECharacteristicCallbacks
         if (!pChar)
             return;
         String val = pChar->getValue();
+
+        if (DEBUG)
+            { String disp = val; disp.replace("\r", "<CR>"); disp.replace("\n", "<LF>"); Serial.printf("[TX] %s\n", disp.c_str()); }
+
         processCommand(val);
     }
 };
 
-// ─── Setup ───────────────────────────────────────────────────
+// Envoi BLE
+void sendResponse(const char *resp)
+{
+    if (pTxCharacteristic)
+    {
+        if (DEBUG)
+        { String disp = resp; disp.replace("\r", "<CR>"); disp.replace("\n", "<LF>"); Serial.printf("[TX] %s\n", disp.c_str()); }
+        pTxCharacteristic->setValue((uint8_t *)resp, strlen(resp));
+        pTxCharacteristic->notify();
+    }
+}
+
+// Setup
 void setup()
 {
     Serial.begin(115200);
@@ -228,25 +218,8 @@ void setup()
 
     Serial.println("BLE prêt");
 
-    // CAN
-    mcp2515.reset();
-    mcp2515.setBitrate(CAN_SPEED, CAN_CLOCK);
-    mcp2515.setConfigMode();
-
-    // Configuration des filtres pour OBD (0x7E8-0x7EF) - CAN 11-bit
-    // Masque = 0x7F8 ignore les 3 bits LSB (bits 2:0)
-    mcp2515.setFilterMask(MCP2515::MASK0, false, 0x7F8);  // Pour RXF0-RXF2, 11-bit
-    mcp2515.setFilterMask(MCP2515::MASK1, false, 0x7F8);  // Pour RXF3-RXF5, 11-bit
-
-    // Filtres : tous pointent vers 0x7E8 (accepte 0x7E8-0x7EF)
-    mcp2515.setFilter(MCP2515::RXF0, false, 0x7E8);
-    mcp2515.setFilter(MCP2515::RXF1, false, 0x7E8);
-    mcp2515.setFilter(MCP2515::RXF2, false, 0x7E8);
-    mcp2515.setFilter(MCP2515::RXF3, false, 0x7E8);
-    mcp2515.setFilter(MCP2515::RXF4, false, 0x7E8);
-    mcp2515.setFilter(MCP2515::RXF5, false, 0x7E8);
-
-    mcp2515.setNormalMode();
+    // Setup CAN/OBD
+    setupOBD(CS_PIN, CAN_SPEED, CAN_CLOCK);
 
     Serial.println("CAN prêt (500kbps)");
 }
@@ -254,5 +227,5 @@ void setup()
 // ─── Loop ────────────────────────────────────────────────────
 void loop()
 {
-    delay(10);
+    delay(5);
 }
