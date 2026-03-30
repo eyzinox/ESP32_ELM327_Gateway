@@ -1,4 +1,4 @@
-# ESP32 ELM327 Gateway
+# ESP32 ELM327 Bridge
 
 A Bluetooth Low Energy (BLE) to CAN bus gateway running on ESP32, emulating an ELM327 OBD-II adapter. This project allows you to read vehicle diagnostic data via BLE/Bluetooth from your smartphone.
 
